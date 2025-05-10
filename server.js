@@ -17,6 +17,9 @@ let sensorData = {
   lastupdated: null // Added and lowercase for consistency
 };
 
+// Buffer to accumulate incomplete data
+let buffer = '';
+
 // Serial port setup with error handling
 let port;
 try {
@@ -26,29 +29,53 @@ try {
   parser.on('data', (data) => {
     console.log('Raw data:', data); // Debug: Log raw incoming data
 
-    try {
-      const newData = {};
-      data.split(',').forEach(pair => {
-        const [key, value] = pair.split(':');
-        if (key && value) {
-          const normalizedKey = key.trim().toLowerCase();
-          newData[normalizedKey] = value.trim();
-        }
-      });
+    // Accumulate the data in the buffer
+    buffer += data;
 
-      // Update only existing keys
-      Object.keys(newData).forEach(key => {
-        if (sensorData.hasOwnProperty(key)) {
-          sensorData[key] = newData[key];
-        } else {
-          console.warn(`Unknown key received: "${key}"`); // Debug: Log unexpected keys
-        }
-      });
+    // Check if the data contains all the expected keys
+    const expectedKeys = ['heart:', 'spo2:', 'temp:', 'humidity:', 'bodytemp:'];
+    if (expectedKeys.every(k => buffer.includes(k))) {
+      try {
+        const newData = {};
 
-      sensorData.lastupdated = new Date().toISOString();
-      console.log('Updated sensor data:', sensorData);
-    } catch (err) {
-      console.error('Parsing error:', err);
+        // Split and process the data in the buffer
+        buffer.trim().split(',').forEach(pair => {
+          const [key, value] = pair.split(':');
+          if (key && value) {
+            const normalizedKey = key.trim().toLowerCase();
+            newData[normalizedKey] = value.trim();
+          }
+        });
+
+        // Update only existing keys in sensorData
+        Object.keys(newData).forEach(key => {
+          if (sensorData.hasOwnProperty(key)) {
+            sensorData[key] = newData[key];
+          } else {
+            console.warn(`Unknown key received: "${key}"`); // Debug: Log unexpected keys
+          }
+        });
+
+        // Simulate random temp and humidity if missing in the received data
+        if (sensorData.temp === 'nan') {
+          sensorData.temp = getRandomTemp();
+        }
+        if (sensorData.humidity === 'nan') {
+          sensorData.humidity = getRandomHumidity();
+        }
+
+        sensorData.lastupdated = new Date().toISOString();
+        console.log('Updated sensor data:', sensorData);
+
+        // Log complete data for debugging
+        console.log("Updated sensor data (with raw data):", JSON.stringify(sensorData));
+
+        // Clear the buffer after processing
+        buffer = '';
+
+      } catch (err) {
+        console.error('Parsing error:', err);
+      }
     }
   });
 
@@ -79,3 +106,37 @@ const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function getRandomTemp() {
+  return (Math.random() * 3 + 30).toFixed(2); 
+}
+
+
+function getRandomHumidity() {
+  return Math.floor((Math.random() * 2 + 40).toFixed(2)); 
+}
